@@ -70,6 +70,7 @@
      * [7.7 Query push failure events](#Query-push-failure-events)
      * [7.8 Update push failure events](#Update-push-failure-events)
      * [7.9 Push Lock, Unlock, Lost, Renew PIN, Replacement card Status](#Push-Lock-Unlock-Lost-Renew-PIN-Replacement-card-Status)
+     * [7.10 Push Apple Pay and Google Pay OTP)
 * [8.Error Codes](#error-codes)
      * [8.1 Business Logic Error Codes](#Business-Logic-Error-Codes)
      * [8.2 Identity Authentication Error Codes](#Identity-Authentication-Error-Codes)
@@ -2839,6 +2840,41 @@ events element convert string to json:
            "request_type": 1,
            "status": 1
        }
+}
+```
+
+### Push Apple Pay and Google Pay OTP
+
+When a card of a special card type is bound to Apple Pay or Google Pay, an OTP is pushed.
+
+| Name | Type | Description |
+| --- | --- | --- |
+| action | String | card-applepay-otp |
+| events[n].params.card_no | String | Card ID |
+| events[n].params.email | String | Email |
+| events[n].params.otp | String | OTP code |
+| events[n].params.wallet_type | String | Wallet type (GOOGLE_PAY, APPLE_PAY) |
+
+Example:
+```
+{
+    "action": "card-3ds-otp",
+    "events": [
+        "{\"id\":\"bc76488ddda4\",\"create_time\":1585293811000,\"params\":{\"card_no\": \"23152180720000050043\",\"email\":\"haxxx@gmail.com\",\"otp\":\"111111\",\"wallet_type\":\"APPLE_PAY\"}}"
+    ]
+}
+
+
+events element convert string to json:
+{
+    "id": "bc76488ddda4",
+    "create_time": 1585293811000,
+    "params": {
+        "card_no": "23152180720000050043",
+        "email": "haxxx@gmail.com",
+        "otp": "111111",
+        "wallet_type": "APPLE_PAY"
+    }
 }
 ```
 
