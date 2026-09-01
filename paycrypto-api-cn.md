@@ -97,6 +97,7 @@
      - [10.9 查询推送失败的事件](#查询推送失败的事件)
      - [10.10 更新推送失败的事件](#更新推送失败的事件)
      - [10.11 推送冻结、解冻、挂失、重置密码、补卡状态](#推送冻结-解冻-挂失-重置密码-补卡状态)
+     - [10.12 推送Apple Pay和Google Pay OTP验证码](#推送Apple Pay和Google Pay OTP验证码)
 - [11.错误码](#错误码)
      - [11.1 业务逻辑错误码](#业务逻辑错误码)
      - [11.2 身份权限认证错误码](#身份权限认证错误码)
@@ -3651,6 +3652,41 @@ events 数组元素从 string 转成 json:
        }
 }
 ```
+
+### 推送Apple Pay和Google Pay OTP验证码
+
+特殊卡种的卡绑定Apple Pay或者Google Pay时，推送OTP验证码
+
+| 名称| 类型|描述 |
+| --- | --- |--- |
+| action |String |  card-applepay-otp |
+| events[n].params.card_no |String | 卡id |
+| events[n].params.email |String | 邮箱 |
+| events[n].params.otp |String | 验证码 |
+| events[n].params.wallet_type |String | 钱包类型（GOOGLE_PAY、APPLE_PAY ） |
+
+示例：
+```
+{ {"card_no":"23152180720000050043","email":"haseyi971122@gmail.com","otp":"111111","wallet_type":"APPLE_PAY"}
+    "action": "card-3ds-otp",
+    "events": [
+        "{\"id\":\"bc76488ddda4\",\"create_time\":1585293811000,\"params\":{\"card_no\": \"23152180720000050043\",\"email\":\"haxxx@gmail.com\",\"otp\":\"111111\",\"wallet_type\":\"APPLE_PAY\"}}"
+    ]
+}
+
+events element convert string to json:
+{
+       "id": "bc76488ddda4",
+       "create_time": 1585293811000,
+       "params":{
+           "card_no": "23152180720000050043",
+           "email": "haxxx@gmail.com",
+           "otp": "111111", 
+           "wallet_type": "APPLE_PAY"
+       }
+}
+```
+
 
 ## 错误码
 
