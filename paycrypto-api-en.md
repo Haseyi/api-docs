@@ -2858,7 +2858,7 @@ When a card of a special card type is bound to Apple Pay or Google Pay, an OTP i
 Example:
 ```
 {
-    "action": "card-3ds-otp",
+    "action": "card-applepay-otp",
     "events": [
         "{\"id\":\"bc76488ddda4\",\"create_time\":1585293811000,\"params\":{\"card_no\": \"23152180720000050043\",\"email\":\"haxxx@gmail.com\",\"otp\":\"111111\",\"wallet_type\":\"APPLE_PAY\"}}"
     ]
