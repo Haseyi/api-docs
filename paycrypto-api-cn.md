@@ -3667,8 +3667,8 @@ events 数组元素从 string 转成 json:
 
 示例：
 ```
-{ {"card_no":"23152180720000050043","email":"haseyi971122@gmail.com","otp":"111111","wallet_type":"APPLE_PAY"}
-    "action": "card-3ds-otp",
+{ 
+    "action": "card-applepay-otp",
     "events": [
         "{\"id\":\"bc76488ddda4\",\"create_time\":1585293811000,\"params\":{\"card_no\": \"23152180720000050043\",\"email\":\"haxxx@gmail.com\",\"otp\":\"111111\",\"wallet_type\":\"APPLE_PAY\"}}"
     ]
