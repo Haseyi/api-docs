@@ -70,7 +70,7 @@
      * [7.7 Query push failure events](#Query-push-failure-events)
      * [7.8 Update push failure events](#Update-push-failure-events)
      * [7.9 Push Lock, Unlock, Lost, Renew PIN, Replacement card Status](#Push-Lock-Unlock-Lost-Renew-PIN-Replacement-card-Status)
-     * [7.10 Push Apple Pay and Google Pay OTP)
+     * [7.10 Push Apple Pay and Google Pay OTP](#Push-Apple-Pay-and-Google-Pay-OTP)
 * [8.Error Codes](#error-codes)
      * [8.1 Business Logic Error Codes](#Business-Logic-Error-Codes)
      * [8.2 Identity Authentication Error Codes](#Identity-Authentication-Error-Codes)
