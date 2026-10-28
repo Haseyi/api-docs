@@ -372,8 +372,6 @@ method：GET
 
 Apply for a virtual account. This API only creates a **local application record** with review status `0-PENDING_REVIEW`; the platform ops team then reviews the application, and the virtual account is created at the upstream bank after approval. Use `GET /api/v1/mm/va/list` to poll the review result and the assigned account number.
 
-Per the bank's latest KYC requirements (SGB Client's Required Info, 2026-10-13), the application must also carry the **extended KYC information** (name split, contact number, address details, occupation / business nature, source of funds & wealth, tax declarations and KYC documents). The extended info is stored locally for platform review/DD and is **not** sent to the upstream bank. KYC documents are uploaded as base64 data strings; the server uploads them to S3 and stores only the file URLs (base64 is never persisted).
-
 ```text
 url：/api/v1/mm/va/apply
 method：POST
