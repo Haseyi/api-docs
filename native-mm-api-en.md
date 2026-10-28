@@ -3,7 +3,15 @@
 * [Native API](#Native-API)
 * [API Specifications](#API-Specifications)
 * [MM](#MM)
-* [Webhook](#Webhook)   
+     * [Asset code list](#asset-code-list)
+     * [Query customer asset](#query-customer-asset)
+     * [Deposit asset](#deposit-asset)
+     * [Query exchange rate](#query-exchange-rate)
+     * [Sell crypto](#sell-crypto)
+     * [Buy crypto](#buy-crypto)
+     * [Exchange history](#exchange-history)
+     * [Exchange order (Deprecated)](#exchange-order-deprecated)
+* [Webhook](#Webhook)
      * [Test push events](#Test-push-events)
 * [Error Codes](#error-codes)
 
@@ -12,10 +20,10 @@
 ## Native API
 
 
-Welcome to the Native API documentation. This document is aimed at Native MM business. 
+Welcome to the Native API documentation. This document is aimed at Native MM business.
 
 
-> It is recommended to testing in the test environment before using the production environment.
+> It is recommended to test in the sandbox environment before using the production environment.
 
 Dashboard :
 
@@ -27,21 +35,23 @@ API :
 * Test environment: https://mmapi-sandbox.native.financial/
 * Production environment: https://mmapi.native.financial/
 
+> **Scope note** — Configuration features such as API key management, whitelist (withdrawal) addresses, sell receivers (payees) and Webhook settings are managed in the **Dashboard** only and are intentionally NOT exposed through this Open API. The Open API covers: asset code list, balance/asset query, deposit (corporate top-up), exchange rate query, sell, buy, and history query.
+
 ## API Specifications
 
 - API requests use `HMAC` authentication.
 
-- **Pagination** - Query record lists are all divided into pages, Pagination parameters: `page_num` represents the page number, `page_size` represents the size of each page. API `DTO` uniformly returns `total`, `records`.
+- **Pagination** - Query record lists are all divided into pages. Pagination parameters: `page_num` represents the page number (starting from `1`), `page_size` represents the size of each page. The response uniformly returns `total` and `records`.
 
 - **Country** - Two digit country codes, refer to `ISO 3166-1 alpha-2` standards.
 
-- Time management - API requests and responses return a `UNIX` timestamp, unit being **seconds**, in order to avoid issues due to regional time differences.
+- **Time** - Time-range request parameters (`former_time`, `latter_time`) and the `tx_time` response field are `UNIX` timestamps in **milliseconds**. Date-time response fields (`created_at`, `updated_at`, `create_time`, `update_time`) are returned as ISO-8601 UTC strings (e.g. `2026-01-15T08:03:20.000+00:00`).
 
-- Amount management - All API requests and responses are of the `string` data type in order to avoid precision loss.
+- **Amount** - All amounts in API requests and responses are of the `string` data type in order to avoid precision loss.
 
-- All the requests that have a `body` but don't explicitly define a format are of `JSON` type, `Content-Type: application/json`
+- All the requests that have a `body` but don't explicitly define a format are of `JSON` type, `Content-Type: application/json`.
 
-- The query interval of all query interfaces must be **less than one month**
+- The query interval of all query interfaces must be **less than one month**.
 
 - API response format standard-
 
@@ -53,7 +63,7 @@ API :
 
 ### HMAC Authentication
 
-The institution first needs to apply for the API `key` and API `secret` that will be used when accessing the API.
+The institution first needs to apply for the API `key` and API `secret` that will be used when accessing the API (created and managed in the Dashboard).
 
 | Term                   | Description                                                                                                                                                                              |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -102,8 +112,23 @@ For illustrative sample code, please refer to [https://github.com/paycrypto-com/
 
 ## MM
 
+Base path of all MM endpoints: `/api/v1/mm/customer/asset`
 
-### asset code list
+| # | Method | Path | Description |
+| :-: | --- | --- | --- |
+| 1 | GET | `/list` | Asset code list |
+| 2 | GET | `` | Query customer asset (balance) |
+| 3 | POST | `/deposit` | Deposit asset (corporate top-up by tx_hash) |
+| 4 | GET | `/exchange-rate` | Query exchange rate |
+| 5 | POST | `/exchange/sell` | Sell crypto (crypto → fiat) |
+| 6 | POST | `/exchange/buy` | Buy crypto (fiat → crypto, by spend amount) |
+| 7 | GET | `/exchange/history` | Exchange history (deposits / sell / buy) |
+| 8 | POST | `/exchange/order` | ⚠️ Deprecated, kept for backward compatibility |
+
+
+### Asset code list
+
+Lists all assets supported by the MM business.
 
 ```text
 url：/api/v1/mm/customer/asset/list
@@ -116,34 +141,51 @@ method：GET
 {
     "code": 0,
     "msg": "SUCCESS",
-    "result":  [
+    "result": [
         {
             "network": "Ethereum",
             "asset_type": "CRYPTO",
             "asset_code": "USDT",
-            "uni_asset_code": "USDT_ERC20",
+            "uni_asset_code": "USDT_ERC20"
+        },
         {
             "network": "Tron",
             "asset_type": "CRYPTO",
             "asset_code": "USDT",
-            "uni_asset_code": "USDT_TRC20",
+            "uni_asset_code": "USDT_TRC20"
         },
         {
             "network": "GL BANK Name",
             "asset_type": "FIAT",
             "asset_code": "USD",
-            "uni_asset_code": "USD_GLBANK",
+            "uni_asset_code": "USD_GLBANK"
         }
-  ]
+    ]
 }
 ```
 
-### Query customer asset 
+| Parameter |  Type  | Description |
+| :--------: | :----: | :---------- |
+| network | String | Network / bank name of the asset |
+| asset_type | String | `CRYPTO` or `FIAT` |
+| asset_code | String | Asset code, e.g. `USDT`, `USD` |
+| uni_asset_code | String | Unified asset code, e.g. `USDT_ERC20`, `USDT_TRC20`, `USD_GLBANK` |
+
+
+### Query customer asset
+
+Query the asset balances of the customer.
 
 ```text
 url：/api/v1/mm/customer/asset
 method：GET
 ```
+
+- Request：
+
+| Parameter |  Type  | Requirement | Description |
+| :--------: | :----: | :---------: | :---------- |
+| currency | String | Optional | Display currency of `total_balance`, default `USD` |
 
 - Response:
 
@@ -160,9 +202,9 @@ method：GET
                 "uni_asset_code": "USDT_ERC20",
                 "account_no": "0xa28B0Ac939FC6BaAaDC79a94f425345C60463417",
                 "address": "0xa28B0Ac939FC6BaAaDC79a94f425345C60463417",
-                "total_balance": 90,
-                "available_balance": 90,
-                "frozen_balance": 0,
+                "total_balance": "90",
+                "available_balance": "90",
+                "frozen_balance": "0",
                 "status": 1
             },
             {
@@ -172,9 +214,9 @@ method：GET
                 "uni_asset_code": "USDT_TRC20",
                 "account_no": "TQn2MYFvDxzHDiLRFsjAXbphfux53RGTFA",
                 "address": "TQn2MYFvDxzHDiLRFsjAXbphfux53RGTFA",
-                "total_balance": 10,
-                "available_balance": 10,
-                "frozen_balance": 0,
+                "total_balance": "10",
+                "available_balance": "10",
+                "frozen_balance": "0",
                 "status": 1
             },
             {
@@ -184,62 +226,66 @@ method：GET
                 "uni_asset_code": "USD_GLBANK",
                 "account_no": "704637748842995188",
                 "address": "704637748842995188",
-                "total_balance": 10000,
-                "available_balance": 10000,
-                "frozen_balance": 0,
+                "total_balance": "10000",
+                "available_balance": "10000",
+                "frozen_balance": "0",
                 "status": 1
             }
-
         ],
         "sum_asset_list": [
             {
                 "asset_code": "USDT",
-                "total_balance": 100,
-                "available_balance": 100,
-                "frozen_balance": 0,
+                "total_balance": "100",
+                "available_balance": "100",
+                "frozen_balance": "0"
             },
-                        {
+            {
                 "asset_code": "USD",
-                "total_balance": 10000,
-                "available_balance": 10000,
-                "frozen_balance": 0,
+                "total_balance": "10000",
+                "available_balance": "10000",
+                "frozen_balance": "0"
             }
         ],
         "total_balance": "10100",
         "total_balance_currency": "USD"
-  }
+    }
 }
 ```
 
-| Parameter |  Type  |          Description          |
-| :--------: | :----: | :------------------------------ |
-|   total_balance   | String |        total_balance              |
-
+| Parameter |  Type  | Description |
+| :--------: | :----: | :---------- |
+| cust_asset_info_list | Array | Per-asset balance detail list |
+| sum_asset_list | Array | Balances aggregated by asset code |
+| total_balance | String | Total balance converted to `total_balance_currency` |
+| total_balance_currency | String | Display currency of `total_balance` |
 
 
 ### Deposit asset
 
-- Request:
+Corporate top-up. After transferring crypto to your deposit address (shown in the Dashboard / asset query), submit the on-chain `tx_hash` through this endpoint. The balance is credited after on-chain verification.
 
 ```text
 url：/api/v1/mm/customer/asset/deposit
 method：POST
 ```
 
-|  Parameter  | Type  | Whether Required |                        Description                         |
-| :---------: | :---: | :--------------: | :-------------------------------------------------------- |
-| uni_asset_code  |  String  |    Required     | uni_asset_code, USDT_TRC20、USDT_ERC20     |
-| tx_hash  |  String  |    Required     | tx_hash    |
+- Request:
+
+|  Parameter  | Type  | Requirement | Description |
+| :---------: | :---: | :---------: | :---------- |
+| uni_asset_code | String | Required | Unified asset code. Supported: `USDT_TRC20`, `USDT_ERC20`, `USDC_ERC20` |
+| tx_hash | String | Required | On-chain transaction hash. The `to` address of the transaction must be your deposit address; a hash can only be declared once |
 
 - Response:
 
-```
+```json
 {
     "code": 0,
     "msg": "SUCCESS",
     "result": true
 }
 ```
+
 
 ### Query exchange rate
 
@@ -250,10 +296,10 @@ method：GET
 
 - Request：
 
-| Parameter |  Type  |   Requirement  | Description   |
-| :------------: | :----: | :----------: |:---------- |
-| from_asset | String |Optional| from_asset |
-| to_asset | String |Optional| to_asset |
+| Parameter |  Type  | Requirement | Description |
+| :--------: | :----: | :---------: | :---------- |
+| from_asset | String | Optional | From asset, e.g. `USDT` |
+| to_asset | String | Optional | To asset, e.g. `USD` |
 
 - Response：
 
@@ -261,7 +307,7 @@ method：GET
 {
     "code": 0,
     "msg": "SUCCESS",
-    "result": [{
+    "result": [
         {
             "from_asset": "USDT",
             "to_asset": "USD",
@@ -272,45 +318,135 @@ method：GET
             "to_asset": "USD",
             "exchange_rate": "0.9999"
         }
-    }]
+    ]
 }
 ```
 
-| Parameter |  Type  |          Description          |
-| :--------: | :----: | :------------------------------ |
+| Parameter |  Type  | Description |
+| :--------: | :----: | :---------- |
+| from_asset | String | From asset |
+| to_asset | String | To asset |
+| exchange_rate | String | Reference exchange rate. The final executed rate of a sell/buy order is determined by the matched quote (advertiser) and fee configuration at order time |
 
 
-### exchange asset
+### Sell crypto
 
-- Request:
+Sell crypto and receive fiat (crypto → fiat). The fiat is paid out to your **receiver (payee)** which must be configured and approved in the Dashboard beforehand.
 
 ```text
-url: /api/v1/mm/customer/asset/exchange/order
+url：/api/v1/mm/customer/asset/exchange/sell
 method：POST
 ```
 
-|  Parameter  | Type  | Whether Required |                        Description                         |
-| :---------: | :---: | :--------------: | :-------------------------------------------------------- |
-|  from_uni_asset_code  |  String  |    Required     |  USDT_ERC20     |
-|  to_uni_asset_code  |  String  |    Required     |  USD     |
-|  crypto_amount  |  String  |    Required     |  10000    |
+- Request:
+
+|  Parameter  | Type  | Requirement | Description |
+| :---------: | :---: | :---------: | :---------- |
+| from_uni_asset_code | String | Required | Crypto to sell, e.g. `USDT_TRC20`, `USDT_ERC20` |
+| to_asset | String | Required | Fiat to receive, e.g. `USD` |
+| crypto_amount | String | Required | Amount of crypto to sell |
+| receive_id | Long | Optional | Receiver (payee) id configured in the Dashboard. If omitted, the approved receiver matching `to_asset` is used; if several match, the request fails and you must specify one |
+| source_of_fund | String | Required | Source of funds declaration |
+| purpose_of_trans | String | Required | Purpose of transaction declaration |
+| remark | String | Optional | Order remark |
+
+- Request example:
+
+```json
+{
+    "from_uni_asset_code": "USDT_TRC20",
+    "to_asset": "USD",
+    "crypto_amount": "1000",
+    "source_of_fund": "Business Revenue",
+    "purpose_of_trans": "Settlement",
+    "remark": "October settlement"
+}
+```
 
 - Response:
 
-```
+```json
 {
     "code": 0,
     "msg": "SUCCESS",
     "result": {
+        "tx_id": "2011710781042962432",
+        "from_uni_asset_code": "USDT_TRC20",
+        "from_amount": "1000",
+        "to_uni_asset_code": "USD",
+        "to_amount": "997",
+        "transaction_type": "sell",
+        "fee": "3",
+        "status": "INIT",
+        "created_at": "2026-01-15T08:03:20.000+00:00",
+        "updated_at": "2026-01-15T08:03:20.000+00:00"
     }
 }
 ```
 
-|    Parameter    |  Type   |      Description                                                     |
-| :---------: | :----:   | :--------------------------- |
+- Amount and fee: the fee is deducted from the crypto amount (`to_amount = crypto_amount − fee`, converted at the executed rate). The order is created with status `INIT` and is settled after platform review; you are notified by Webhook, or you can poll [Exchange history](#exchange-history).
 
 
-### exchange asset history
+### Buy crypto
+
+Buy crypto with fiat (fiat → crypto), by **spend amount**: you specify the total fiat amount to spend, the fee is deducted **from within** the spend amount, and the crypto you receive is `(spend_amount − fee) / rate`. The crypto is sent to your **whitelist address** which must be configured and approved in the Dashboard beforehand. For orders paid by bank transfer, upload the payment receipt in the Dashboard after placing the order.
+
+```text
+url：/api/v1/mm/customer/asset/exchange/buy
+method：POST
+```
+
+- Request:
+
+|  Parameter  | Type  | Requirement | Description |
+| :---------: | :---: | :---------: | :---------- |
+| from_asset | String | Required | Fiat to spend, e.g. `USD` |
+| to_uni_asset_code | String | Required | Crypto to receive, e.g. `USDT_TRC20`, `USDT_ERC20` |
+| spend_amount | String | Required | Total fiat amount to spend (**fee included**) |
+| address | String | Optional | Receiving crypto address. Must be an approved whitelist address of your account. If omitted and exactly one approved whitelist address exists for the crypto, it is used; otherwise the request fails and you must specify one |
+| source_of_fund | String | Required | Source of funds declaration |
+| purpose_of_trans | String | Required | Purpose of transaction declaration |
+| remark | String | Optional | Order remark |
+
+- Request example:
+
+```json
+{
+    "from_asset": "USD",
+    "to_uni_asset_code": "USDT_TRC20",
+    "spend_amount": "10000",
+    "source_of_fund": "Business Revenue",
+    "purpose_of_trans": "Settlement"
+}
+```
+
+- Response:
+
+```json
+{
+    "code": 0,
+    "msg": "SUCCESS",
+    "result": {
+        "tx_id": "2011710781042962433",
+        "from_uni_asset_code": "USD",
+        "from_amount": "10000",
+        "to_uni_asset_code": "USDT_TRC20",
+        "to_amount": "9970",
+        "transaction_type": "buy",
+        "fee": "30",
+        "status": "INIT",
+        "created_at": "2026-01-15T08:03:20.000+00:00",
+        "updated_at": "2026-01-15T08:03:20.000+00:00"
+    }
+}
+```
+
+> Note: the legacy endpoint `POST /api/v1/mm/customer/asset/exchange/order` (crypto-amount based) is deprecated. New integrations must use `/exchange/buy` (spend based) and `/exchange/sell`.
+
+
+### Exchange history
+
+Query deposit / sell / buy history records.
 
 ```text
 url：/api/v1/mm/customer/asset/exchange/history
@@ -319,12 +455,13 @@ method：GET
 
 - Request：
 
-| Parameter |  Type  |   Requirement  | Description   |
-| :------------: | :----: | :----------: |:---------- |
-|  page_num   |  int  |     Optional     |                        Page number                         |
-|  page_size  |  int  |     Optional     |                         Page size                          |
-| former_time | long  |     Optional     | Time period upper limit, `UNIX` timestamp, Unit: `seconds` |
-| latter_time | long  |     Optional     | Time period lower limit, `UNIX` timestamp, Unit: `seconds` |
+| Parameter |  Type  | Requirement | Description |
+| :--------: | :----: | :---------: | :---------- |
+| page_num | int | Optional | Page number, default `1` |
+| page_size | int | Optional | Page size, default `20` |
+| type | String | Optional | Record type: `deposit`, `sell`, `buy`. Empty = all types |
+| former_time | long | Optional | Time period upper limit, `UNIX` timestamp, unit: `milliseconds` |
+| latter_time | long | Optional | Time period lower limit, `UNIX` timestamp, unit: `milliseconds` |
 
 - Response：
 
@@ -339,31 +476,58 @@ method：GET
         "pages": 1,
         "records": [
             {
-                "id": 7,
-                "tx_id": "2011710781042962432",
-                "business_ref_no": "EX_2011710780833247232",
-                "account_no": "704637748842995188",
-                "address": "704637748842995188",
-                "from_uni_asset_code": "USDT_ERC20",
-                "to_uni_asset_code": "USD",
-                "transaction_type": "sell",
+                "order_no": "2011710781042962432",
+                "chain": "Tron",
+                "coin_type": "USDT",
+                "address": "TQn2MYFvDxzHDiLRFsjAXbphfux53RGTFA",
+                "from": "TQn2MYFvDxzHDiLRFsjAXbphfux53RGTFA",
+                "to": "704637748842995188",
+                "tx_hash": "",
+                "tx_time": "1768464200000",
                 "amount": "1000",
-                "fee": "3",
-                "status": "INIT",
-                "reason": "",
                 "remark": "",
-                "created_at": 1768464200000,
-                "updated_at": 1768464200000
-            }          
+                "before_balance": "0",
+                "after_balance": "0",
+                "create_time": "2026-01-15T08:03:20.000+00:00",
+                "update_time": "2026-01-15T08:03:20.000+00:00",
+                "tx_status": 0,
+                "trade_type": 0,
+                "record_type": "out"
+            }
         ]
     }
-
 }
 ```
 
-| Parameter |  Type  |          Description          |
-| :--------: | :----: | :------------------------------ |
+| Parameter |  Type  | Description |
+| :--------: | :----: | :---------- |
+| order_no | String | Order number (`tx_id` of the sell/buy order; deposit orders use their deposit reference) |
+| record_type | String | `deposit`: deposit record; `out`: sell order; `in`: buy order |
+| trade_type | int | `0`: sell, `1`: buy (only for sell/buy records) |
+| tx_status | int | Order status. Sell/buy: `0` submitted (pending platform review), `1` success, `2` paying out, `4` failed. Deposit: on-chain credit status |
+| amount | String | Crypto amount of the record |
+| tx_time | String | Last status-change time, `UNIX` timestamp in `milliseconds` |
+| create_time / update_time | String | Creation / update time, ISO-8601 (UTC) |
 
+
+### Exchange order (Deprecated)
+
+> ⚠️ **Deprecated** — kept for backward compatibility only. This endpoint mixes sell and buy in one request and infers the direction from the asset categories (crypto → fiat = sell, fiat → crypto = buy). New integrations must use [Sell crypto](#sell-crypto) and [Buy crypto](#buy-crypto) instead.
+
+```text
+url：/api/v1/mm/customer/asset/exchange/order
+method：POST
+```
+
+|  Parameter  | Type  | Requirement | Description |
+| :---------: | :---: | :---------: | :---------- |
+| from_uni_asset_code | String | Required | Asset to pay, e.g. `USDT_TRC20` (sell) or `USD` (buy) |
+| to_uni_asset_code | String | Required | Asset to receive, e.g. `USD` (sell) or `USDT_ERC20` (buy) |
+| crypto_amount | String | Required | Crypto amount |
+| source_of_fund | String | Required | Source of funds declaration |
+| purpose_of_trans | String | Required | Purpose of transaction declaration |
+
+- Response: same structure as [Sell crypto](#sell-crypto).
 
 
 
@@ -702,6 +866,7 @@ method：GET
 
 
 
+
 ## Webhook
 
 
@@ -749,6 +914,8 @@ Response Example:
    "msg":"SUCCESS"
 }
 ```
+
+> Sell / buy orders are pushed as exchange events when the platform review completes (status becomes `SUCCESS` or `FAILED`).
 
 
 ### Test push events
@@ -798,8 +965,22 @@ events element convert string to json:
 | :---------: | ----------------------------------------------------------- |
 |      0      | Succesful                                                   |
 |   111001    | Request parameter error                                     |
-|   130002    | Data not found                                              |
-
+|   111049    | Coin type not supported                                     |
+|   111074    | Amount is not within the advertiser limit                   |
+|   111082    | Wallet address error (address not in approved whitelist)    |
+|   111093    | Invalid parameters                                          |
+|   101040    | Account not found                                           |
+|   101051    | The tx_hash already exists (deposit already declared)       |
+|   101052    | Insufficient wallet balance                                 |
+|   101055    | Address status abnormal (not approved yet)                  |
+|   101056    | Multiple approved receivers found, please specify receive_id |
+|   101057    | Multiple approved whitelist addresses found, please specify address |
+|   112016    | Receiver currency does not match the order currency         |
+|   15009     | Transaction hash does not match (wrong `to` address etc.)   |
+|   119012    | Rate error                                                  |
+|   130002    | Data not found (e.g. receiver / asset not configured)       |
+|   130015    | Status abnormal                                             |
+|   130018    | Insufficient balance                                        |
 
 ### Identity Authentication Error Codes
 
