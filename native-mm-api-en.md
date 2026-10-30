@@ -7,10 +7,14 @@
      * [Query customer asset](#query-customer-asset)
      * [Deposit asset](#deposit-asset)
      * [Query exchange rate](#query-exchange-rate)
+     * [Sell receiver list](#sell-receiver-list)
      * [Sell crypto](#sell-crypto)
+     * [Whitelist address list](#whitelist-address-list)
      * [Buy crypto](#buy-crypto)
      * [Exchange history](#exchange-history)
      * [Exchange order (Deprecated)](#exchange-order-deprecated)
+     * [Apply for virtual account](#apply-for-virtual-account)
+     * [Query virtual account list](#query-virtual-account-list)
 * [Webhook](#Webhook)
      * [Test push events](#Test-push-events)
 * [Error Codes](#error-codes)
@@ -35,7 +39,7 @@ API :
 * Test environment: https://mmapi-sandbox.native.financial/
 * Production environment: https://mmapi.native.financial/
 
-> **Scope note** — Configuration features such as API key management, whitelist (withdrawal) addresses, sell receivers (payees) and Webhook settings are managed in the **Dashboard** only and are intentionally NOT exposed through this Open API. The Open API covers: asset code list, balance/asset query, deposit (corporate top-up), exchange rate query, sell, buy, and history query.
+> **Scope note** — Configuration features such as API key management, whitelist (withdrawal) addresses, sell receivers (payees) and Webhook settings are created and managed in the **Dashboard**; the Open API only provides read-only list queries for them ([Sell receiver list](#sell-receiver-list), [Whitelist address list](#whitelist-address-list)) so that you can obtain the `receive_id` for sell orders and the receiving `address` for buy orders. The Open API covers: asset code list, balance/asset query, deposit (corporate top-up), exchange rate query, sell, buy, receiver/whitelist list query, and history query.
 
 ## API Specifications
 
@@ -120,10 +124,12 @@ Base path of all MM endpoints: `/api/v1/mm/customer/asset`
 | 2 | GET | `` | Query customer asset (balance) |
 | 3 | POST | `/deposit` | Deposit asset (corporate top-up by tx_hash) |
 | 4 | GET | `/exchange-rate` | Query exchange rate |
-| 5 | POST | `/exchange/sell` | Sell crypto (crypto → fiat) |
-| 6 | POST | `/exchange/buy` | Buy crypto (fiat → crypto, by spend amount) |
-| 7 | GET | `/exchange/history` | Exchange history (deposits / sell / buy) |
-| 8 | POST | `/exchange/order` | ⚠️ Deprecated, kept for backward compatibility |
+| 5 | GET | `/exchange/sell/receiver` | Sell receiver (payee) list; the returned `bank_acct_id` is the `receive_id` of sell |
+| 6 | POST | `/exchange/sell` | Sell crypto (crypto → fiat) |
+| 7 | GET | `/exchange/buy/whitelist-address` | Whitelist address list; the returned `address` is the receiving `address` of buy |
+| 8 | POST | `/exchange/buy` | Buy crypto (fiat → crypto, by spend amount) |
+| 9 | GET | `/exchange/history` | Exchange history (deposits / sell / buy) |
+| 10 | POST | `/exchange/order` | ⚠️ Deprecated, kept for backward compatibility |
 
 
 ### Asset code list
@@ -289,6 +295,8 @@ method：POST
 
 ### Query exchange rate
 
+Query the exchange rate calculated from the advertiser (quote) configured for your account: **`exchange_rate = 1 - fee_rate`**, where `fee_rate` is the trade fee rate of the matched advertiser (sell quotes for crypto → fiat, buy quotes for fiat → crypto), including the market-price-covered adjustment when configured. If no advertiser matches the requested asset pair, an empty list is returned.
+
 ```text
 url：/api/v1/mm/customer/asset/exchange-rate
 method：GET
@@ -298,8 +306,8 @@ method：GET
 
 | Parameter |  Type  | Requirement | Description |
 | :--------: | :----: | :---------: | :---------- |
-| from_asset | String | Optional | From asset, e.g. `USDT` |
-| to_asset | String | Optional | To asset, e.g. `USD` |
+| from_asset | String | Optional | From asset. Crypto must be a uni asset code such as `USDT_ERC20`, `USDT_TRC20`, `USDC_ERC20` (the `USDT-ERC20` hyphen form is also accepted); fiat uses its currency code, e.g. `USD`. When `from_asset` is crypto, sell quotes (crypto → fiat) are matched; when it is fiat, buy quotes (fiat → crypto) are matched |
+| to_asset | String | Optional | To asset, same format rules as `from_asset`. If both are provided, one must be fiat and the other crypto; if both are empty, the rates of all quotes configured for your account are returned |
 
 - Response：
 
@@ -309,14 +317,14 @@ method：GET
     "msg": "SUCCESS",
     "result": [
         {
-            "from_asset": "USDT",
+            "from_asset": "USDT_ERC20",
             "to_asset": "USD",
-            "exchange_rate": "0.9999"
+            "exchange_rate": "0.997"
         },
         {
-            "from_asset": "USDC",
-            "to_asset": "USD",
-            "exchange_rate": "0.9999"
+            "from_asset": "USD",
+            "to_asset": "USDT_ERC20",
+            "exchange_rate": "0.997"
         }
     ]
 }
@@ -324,9 +332,69 @@ method：GET
 
 | Parameter |  Type  | Description |
 | :--------: | :----: | :---------- |
-| from_asset | String | From asset |
-| to_asset | String | To asset |
-| exchange_rate | String | Reference exchange rate. The final executed rate of a sell/buy order is determined by the matched quote (advertiser) and fee configuration at order time |
+| from_asset | String | From asset (uni asset code for crypto, e.g. `USDT_ERC20`) |
+| to_asset | String | To asset (uni asset code for crypto, e.g. `USDT_ERC20`) |
+| exchange_rate | String | `1 - fee_rate` of the matched advertiser quote. The final executed rate/fee of a sell/buy order is determined by the matched quote and fee configuration at order time |
+
+
+### Sell receiver list
+
+List the sell receivers (payees) of your account. Receivers are created and approved in the Dashboard; use the returned `bank_acct_id` as the `receive_id` of [Sell crypto](#sell-crypto).
+
+```text
+url：/api/v1/mm/customer/asset/exchange/sell/receiver
+method：GET
+```
+
+- Request：
+
+| Parameter |  Type  | Requirement | Description |
+| :--------: | :----: | :---------: | :---------- |
+| page_num | int | Optional | Page number, default `1` |
+| page_size | int | Optional | Page size, default `10` |
+| currency | String | Optional | Filter by supported receive currency, e.g. `USD` (also matches receivers supporting multiple comma-separated currencies) |
+| status | int | Optional | Filter by review status: `0` reviewing, `1` approved (usable for sell), `2` rejected, `3` to be modified, `4` incomplete |
+
+- Response：
+
+```json
+{
+    "code": 0,
+    "msg": "SUCCESS",
+    "result": {
+        "page_num": 1,
+        "page_size": 10,
+        "total": 1,
+        "pages": 1,
+        "records": [
+            {
+                "bank_acct_id": "20118001",
+                "label": "USD payee",
+                "account_type": "enterprise",
+                "bank_name": "GL BANK",
+                "bank_account": "704637748842995188",
+                "swift_code": "GLDBSGSG",
+                "currency": "USD",
+                "status": 1,
+                "create_time": "2026-01-15T08:03:20.000+00:00",
+                "update_time": "2026-01-15T08:03:20.000+00:00"
+            }
+        ]
+    }
+}
+```
+
+| Parameter |  Type  | Description |
+| :--------: | :----: | :---------- |
+| bank_acct_id | String | Receiver id returned by the bank. Pass it as `receive_id` when placing a sell order |
+| label | String | Receiver nickname |
+| account_type | String | `individual` or `enterprise` |
+| bank_name | String | Bank name |
+| bank_account | String | Bank account / IBAN |
+| swift_code | String | SWIFT code |
+| currency | String | Supported receive currencies, may be comma-separated (e.g. `USD,EUR`) |
+| status | int | Review status. Only `1` (approved) receivers can be used in sell orders |
+| create_time / update_time | String | Creation / update time, ISO-8601 (UTC) |
 
 
 ### Sell crypto
@@ -345,7 +413,7 @@ method：POST
 | from_uni_asset_code | String | Required | Crypto to sell, e.g. `USDT_TRC20`, `USDT_ERC20` |
 | to_asset | String | Required | Fiat to receive, e.g. `USD` |
 | crypto_amount | String | Required | Amount of crypto to sell |
-| receive_id | Long | Optional | Receiver (payee) id configured in the Dashboard. If omitted, the approved receiver matching `to_asset` is used; if several match, the request fails and you must specify one |
+| receive_id | Long | Optional | `bank_acct_id` of an approved receiver (payee), obtained via [Sell receiver list](#sell-receiver-list) (receivers are configured and approved in the Dashboard). If omitted, the approved receiver matching `to_asset` is used; if several match, the request fails and you must specify one |
 | source_of_fund | String | Required | Source of funds declaration |
 | purpose_of_trans | String | Required | Purpose of transaction declaration |
 | remark | String | Optional | Order remark |
@@ -387,6 +455,62 @@ method：POST
 - Amount and fee: the fee is deducted from the crypto amount (`to_amount = crypto_amount − fee`, converted at the executed rate). The order is created with status `INIT` and is settled after platform review; you are notified by Webhook, or you can poll [Exchange history](#exchange-history).
 
 
+### Whitelist address list
+
+List the whitelist (withdrawal) addresses of your account. Whitelist addresses are created and approved in the Dashboard; use the returned `address` as the receiving `address` of [Buy crypto](#buy-crypto).
+
+```text
+url：/api/v1/mm/customer/asset/exchange/buy/whitelist-address
+method：GET
+```
+
+- Request：
+
+| Parameter |  Type  | Requirement | Description |
+| :--------: | :----: | :---------: | :---------- |
+| page_num | int | Optional | Page number, default `1` |
+| page_size | int | Optional | Page size, default `10` |
+| uni_asset_code | String | Optional | Filter by crypto, e.g. `USDT_TRC20` |
+| status | int | Optional | Filter by status. `1` = enabled (usable for buy) |
+
+- Response：
+
+```json
+{
+    "code": 0,
+    "msg": "SUCCESS",
+    "result": {
+        "page_num": 1,
+        "page_size": 10,
+        "total": 1,
+        "pages": 1,
+        "records": [
+            {
+                "id": 101,
+                "uni_asset_code": "USDT_TRC20",
+                "chain": "Tron",
+                "address": "TQn2MYFvDxzHDiLRFsjAXbphfux53RGTFA",
+                "address_name": "main tron address",
+                "status": 1,
+                "create_time": "2026-01-15T08:03:20.000+00:00",
+                "update_time": "2026-01-15T08:03:20.000+00:00"
+            }
+        ]
+    }
+}
+```
+
+| Parameter |  Type  | Description |
+| :--------: | :----: | :---------- |
+| id | int | Whitelist address record id |
+| uni_asset_code | String | Uni asset code, e.g. `USDT_TRC20` |
+| chain | String | Chain name, e.g. `Ethereum`, `Tron` |
+| address | String | Whitelist address. Pass it as `address` when placing a buy order |
+| address_name | String | Address label |
+| status | int | Only `1` (enabled) addresses can be used in buy orders |
+| create_time / update_time | String | Creation / update time, ISO-8601 (UTC) |
+
+
 ### Buy crypto
 
 Buy crypto with fiat (fiat → crypto), by **spend amount**: you specify the total fiat amount to spend, the fee is deducted **from within** the spend amount, and the crypto you receive is `(spend_amount − fee) / rate`. The crypto is sent to your **whitelist address** which must be configured and approved in the Dashboard beforehand. For orders paid by bank transfer, upload the payment receipt in the Dashboard after placing the order.
@@ -403,7 +527,7 @@ method：POST
 | from_asset | String | Required | Fiat to spend, e.g. `USD` |
 | to_uni_asset_code | String | Required | Crypto to receive, e.g. `USDT_TRC20`, `USDT_ERC20` |
 | spend_amount | String | Required | Total fiat amount to spend (**fee included**) |
-| address | String | Optional | Receiving crypto address. Must be an approved whitelist address of your account. If omitted and exactly one approved whitelist address exists for the crypto, it is used; otherwise the request fails and you must specify one |
+| address | String | Optional | Receiving crypto address. Must be an approved whitelist address of your account, obtained via [Whitelist address list](#whitelist-address-list) (whitelist addresses are configured and approved in the Dashboard). If omitted and exactly one approved whitelist address exists for the crypto, it is used; otherwise the request fails and you must specify one |
 | source_of_fund | String | Required | Source of funds declaration |
 | purpose_of_trans | String | Required | Purpose of transaction declaration |
 | remark | String | Optional | Order remark |
